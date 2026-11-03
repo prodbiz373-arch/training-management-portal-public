@@ -1,0 +1,20 @@
+<!-- Template only: review the directory/retention/size policy before using as logging.config. -->
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+  <!-- Required: absolute private directory, pre-created with restricted permissions. -->
+  <property name="AUDIT_DIR" value="${TRAINING_PORTAL_AUDIT_LOG_DIR}"/>
+  <appender name="AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${AUDIT_DIR}/audit.jsonl</file>
+    <encoder><pattern>%msg%n</pattern></encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${AUDIT_DIR}/audit.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+      <maxFileSize>${TRAINING_PORTAL_AUDIT_MAX_FILE_SIZE:-10MB}</maxFileSize>
+      <maxHistory>${TRAINING_PORTAL_AUDIT_MAX_HISTORY:-30}</maxHistory>
+      <totalSizeCap>${TRAINING_PORTAL_AUDIT_TOTAL_SIZE_CAP:-1GB}</totalSizeCap>
+      <cleanHistoryOnStart>true</cleanHistoryOnStart>
+    </rollingPolicy>
+  </appender>
+  <logger name="SECURITY_AUDIT" level="INFO" additivity="false"><appender-ref ref="AUDIT_FILE"/></logger>
+  <root level="INFO"><appender-ref ref="CONSOLE"/></root>
+</configuration>

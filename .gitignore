@@ -1,0 +1,65 @@
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Addition ###
+.DS_Store
+
+# Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*
+!frontend/.env.example
+frontend/*.tsbuildinfo
+frontend/coverage/
+
+# Local dependency/build caches (at any project depth)
+node_modules/
+.next/
+.pnpm-store/
+
+# Local secrets; keep reviewed configuration templates available
+.env
+.env.*
+!.env.example
+.pgpass
+runtime-credentials.json
+
+# Database backups and local verification output
+*.dump
+*.backup
+*.sql.gz
+*.log
+*.tmp
+~$*.xlsx

@@ -1,0 +1,41 @@
+# 第3段階：パスワード方針案・画面ヘッダー・監査ログ
+
+この文書は独立作業コピーの実装と検証範囲を説明する。原本・公開候補への反映、外部配備、Public化を承認するものではない。
+
+## パスワード：現行仕様を維持、以下は未承認の提案
+
+登録・変更は既存BCryptとUTF-8の72バイト上限を維持する。新規登録・ログインは空白のみを拒否し、更新時の空欄は変更なし。初期講師も同じServiceの検証を通る。既存ハッシュや短い既存パスワードは無効化していない。Frontendには72バイトの事前検証がなく、Backendの入力エラーを表示する。文字数のHTML制限だけではバイト上限と一致しないため、今後クライアント側で補助するならTextEncoderによる同じ条件を使用する。
+
+推奨案は、新規設定・変更時に15 Unicodeコードポイント以上と、漏えい済み・頻出パスワードの拒否を導入すること。組合せ規則、定期変更、暗黙の正規化・切詰めは導入しない。既存ログインへの遡及適用と初期講師への適用方法は別途承認する。移行案として12文字以上も考えられるが、単要素認証のNIST推奨と同等とは説明しない。8文字案はMFAを導入する場合の別検討である。
+
+現行最大値は72バイト（ASCII72文字、日本語の典型的な3バイト文字24文字、4バイト絵文字18文字）。64 Unicode文字を常に受理する要件とは両立しない。アルゴリズム移行や既存ハッシュの段階移行は別工程とし、現在をNIST準拠とは判定しない。漏えい対策は版管理したローカル拒否リストを優先し、外部prefix照会はプライバシー・可用性・失敗時動作を決めてから採用する。生パスワードや完全ハッシュを外部へ送らない。いずれも今回未実装。
+
+根拠：[NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html)。
+
+## Next画面のヘッダー
+
+proxyでリクエストごとにランダムnonceを生成し、外部からのnonce/CSPを上書きする。動的レンダリングでNext生成スクリプトにnonceを適用し、HTMLはprivate/no-storeとする。CSPはself、nonce、strict-dynamic、スクリプト属性禁止、object/base/frame制限を採用する。unsafe-inline/unsafe-evalは許可しない。API接続先はNEXT_PUBLIC_API_BASE_URLの正確なOriginのみ許可し、URLの認証情報・ワイルドカード・query/hashを拒否する。HTTPS確認時はHTTP APIを拒否する。画像のdata/blobとself、自己ホストフォントを許可する。
+
+開発サーバーのデバッグ機構との衝突を避け、NODE_ENV=developmentのみReport-Only。本番ビルド/startは強制する。nonce方式に伴い全画面は動的レンダリングとなり、静的HTML/CDNキャッシュを前提とした配備は再設計が必要。ログイン画面の同一グラデーションをinline styleからCSSクラスへ移し、色・配置は維持した。
+
+nosniff、DENY、strict-origin-when-cross-origin、camera/microphone/geolocation/payment禁止をNextから返す。API側のSpringのnosniff/フレーム拒否は維持する。SpringのAPIヘッダーを画面の保護と混同しない。
+
+HSTSはNext・Springとも既定無効。TRAINING_PORTAL_HTTPS_CONFIRMED=trueとTRAINING_PORTAL_HSTS_MAX_AGE_SECONDS（1〜31536000）の明示設定が必要。includeSubDomains/preloadは付けない。ドメイン、TLS終端、全HTTP経路の遮断、信頼プロキシ、回復手順を確認してから短いmax-ageで開始する。HTTPS確認フラグは運用者の申告であり、TLSを検証・構築する機能ではない。既存prodのHTTPS必須・転送ヘッダー不信・Secure Cookieを維持する。
+
+根拠：[Next公式CSPガイド](https://nextjs.org/docs/app/guides/content-security-policy)。strict-dynamicは信頼されたスクリプトが生成する子スクリプトへ信頼を伝播する。任意の動的スクリプトが一律禁止されるとは説明しない。DOMへの危険な値の挿入を避ける対策も引き続き必要。
+
+## 監査ログと運用上の未決事項
+
+LOGIN_SUCCESS/FAILURE/LIMITED、LOGOUT、SESSION_EXPIRED、AUTHENTICATION_REQUIRED、ACCESS_DENIEDと、成功したメンバー登録・更新・削除を記録する。API契約や認証の可否は変更しない。失効要求では失効と401の両イベントを記録し得る。HTTPタイムアウトによるサーバー内セッション破棄そのものを網羅するイベントではない。管理操作はHTTP成功の観測であり、DBコミットとログの原子的保証や変更内容の完全な履歴ではない。
+
+固定JSONのschema/time/event/status/actor/sourceのみ。パスワード、Cookie、CSRF、秘密鍵、URL、本文、氏名、例外詳細を出さない。社員IDとsocket送信元を別ドメインのHMAC-SHA256で仮名化し、任意の転送ヘッダーは利用しない。仮名化値も個人情報としてアクセス制限する。リバースプロキシ配下ではsourceがプロキシ単位となる限界がある。
+
+TRAINING_PORTAL_AUDIT_HMAC_KEYには32バイト以上のランダム鍵をBase64で安全に注入する。値はGitやログに保存しない。未設定・不正値はプロセス内の一時鍵へフォールバックし、再起動を跨ぐ相関はできない。安定相関が必要な運用は起動前に鍵の妥当性を確認し、保管・ローテーション権限を決める。鍵更新で過去との相関が変わる。
+
+TRAINING_PORTAL_AUDIT_QUEUE_CAPACITYは既定1024（実装上1〜100000に制限）。非同期・有界キューで、満杯や出力例外は破棄して認証を継続する。停止処理も有界待機。これはベストエフォートであり、プロセスクラッシュや出力停止時の完全性は保証しない。droppedEventsと任意のローカルJMX属性でキュー/直接Sink例外の破棄数を取得可能だが、Logback内部で吸収されたディスクエラー等をすべて数えるものではない。実配備では配送先の稼働監視・ログ欠落監視を別途用意する。JMXを公開ネットワークに無認証で開放しない。
+
+既定は専用logger SECURITY_AUDITのstdout出力でファイルを生成しない。保存先・保持期間・閲覧者は運用承認前である。[外部Logback設定例](templates/logback-audit-file.xml.example)はlogging.configで明示的に採用するテンプレート。使用前にTRAINING_PORTAL_AUDIT_LOG_DIRの絶対パスと権限を検証し、専用ディレクトリ0700、ファイル0600、umask077等を設定する。30日/10MB/合計1GBは例であり確定保持方針ではない。容量、保持、圧縮、削除、バックアップ、転送時暗号化、アクセス権限を決めてから有効化する。ログをHTTPのstatic配信対象へ置かない。
+
+## 設計書への今後の反映
+
+パスワード方針は承認後に登録・変更・初期講師の仕様へ反映する。nonce動的画面、キャッシュ/HSTS運用条件、監査イベントと欠落特性・保持方針を設計書へ追記する候補とする。Excelは今回変更していない。侵入試験、実際のTLS/プロキシ、ログ保存先の障害・ローテーション、本番負荷試験は別途必要。

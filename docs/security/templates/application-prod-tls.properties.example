@@ -1,0 +1,10 @@
+# Template only. Supply outside version control using spring.config.additional-location.
+# Activate prod separately. No real host, certificate, password or proxy is preselected.
+server.ssl.enabled=true
+server.ssl.key-store=${TRAINING_PORTAL_TLS_KEY_STORE}
+server.ssl.key-store-password=${TRAINING_PORTAL_TLS_KEY_STORE_PASSWORD}
+server.ssl.key-store-type=${TRAINING_PORTAL_TLS_KEY_STORE_TYPE:PKCS12}
+server.forward-headers-strategy=none
+training.portal.frontend-origin=${TRAINING_PORTAL_FRONTEND_ORIGIN}
+# Allow only HTTPS on the public edge; keep backend TLS if using a reverse proxy.
+# Do not expose the backend connector directly to untrusted networks.
